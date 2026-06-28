@@ -83,6 +83,6 @@ Recompute the `sha256` after any rebuild with `sha256sum dist/plugin.wasm`:
   "hooks": ["http.request.before", "http.request.authed"],
   "url": "https://github.com/PeckBoard/diff-viewer/releases/download/v0.1.0/diff-viewer.wasm",
   "sha256": "756fd677a62acedee8a1332aea6f548d875f25515febf319831a486cb28be5a1",
-  "min_peckboard": "0.0.19"
+  "min_peckboard": "0.0.27"
 }
 ```
