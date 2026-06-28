@@ -5,7 +5,7 @@ const DESCRIPTION =
   "Diff viewer for Peckboard: a side-by-side viewer/editor for every file that " +
   "differs from the remote main branch (origin/main), including new files and " +
   "images, served as a WASM plugin.";
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 const REPOSITORY = "https://github.com/PeckBoard/diff-viewer";
 
 /// Build the manifest JSON string. `index.ts`'s `manifest()` export wraps this.
@@ -17,8 +17,13 @@ export function manifestJson(): string {
 
     hooks: ["http.request.before", "http.request.authed"],
 
-    // The served page that the sidebar item opens.
-    sidebar_items: [
+    // Full-page entries on the project and session pages. The diff is scoped to
+    // that project's / session's folder — opened from the global sidebar there
+    // is no folder to diff, so this plugin contributes only the scoped surfaces.
+    project_items: [
+      { id: "diff-viewer", label: "Diff Viewer", path: "/plugin-api/v1/diff-viewer" },
+    ],
+    session_items: [
       { id: "diff-viewer", label: "Diff Viewer", path: "/plugin-api/v1/diff-viewer" },
     ],
 
