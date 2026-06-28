@@ -93,12 +93,27 @@ export function childDirs(dir: string, dirs: Set<string>): string[] {
   return out;
 }
 
-/// Whether `prefix` is the *root* of a git work tree. At a work-tree root
-/// `rev-parse --show-cdup` exits 0 with empty output; in a subdir it returns a
-/// `../` path, and outside any repo it errors.
+/// Whether `prefix` is the *root* of a git work tree — decided by a cheap file
+/// read, NOT a `git` spawn. Each `peckboard_exec` spawns a process (~tens of
+/// ms); probing every candidate directory that way blows core's 2s per-call
+/// timeout on a real folder. Reading the repo's `.git` marker is a sub-ms host
+/// fs call, so discovery scales to hundreds of directories.
+///
+/// A normal work-tree root has `.git/HEAD`; a submodule or linked worktree has
+/// a `.git` *file* whose content begins `gitdir:`.
 function isRepoRoot(prefix: string): boolean {
-  const r = gitExec(gitArgs(prefix, ["rev-parse", "--show-cdup"]));
-  return r.exit_code === 0 && r.stdout.trim() === "";
+  try {
+    const head = readFile(joinRepoPath(prefix, ".git/HEAD"));
+    if (head.content.length > 0) return true;
+  } catch (_e) {
+    // not a normal repo root; fall through to the .git-file case
+  }
+  try {
+    const dotgit = readFile(joinRepoPath(prefix, ".git"));
+    return dotgit.content.indexOf("gitdir:") >= 0;
+  } catch (_e) {
+    return false;
+  }
 }
 
 /// Discover git repo roots within the caller's folder. BFS from the folder

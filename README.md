@@ -88,9 +88,9 @@ Recompute the `sha256` after any rebuild with `sha256sum dist/plugin.wasm`:
   "description": "Pick any git repo in the project/session folder, then get a side-by-side viewer/editor for every file that differs from origin/main, including new files and images, served as a WASM plugin.",
   "author": "PeckBoard",
   "homepage": "https://github.com/PeckBoard/diff-viewer",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "hooks": ["http.request.before", "http.request.authed"],
-  "url": "https://github.com/PeckBoard/diff-viewer/releases/download/v0.3.0/diff-viewer.wasm",
+  "url": "https://github.com/PeckBoard/diff-viewer/releases/download/v0.3.1/diff-viewer.wasm",
   "sha256": "<recompute from the released asset: sha256sum dist/plugin.wasm>",
   "min_peckboard": "0.0.28"
 }

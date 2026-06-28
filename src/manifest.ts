@@ -6,7 +6,7 @@ const DESCRIPTION =
   "then get a side-by-side viewer/editor for every file that differs from the " +
   "remote main branch (origin/main), including new files and images, served as " +
   "a WASM plugin.";
-const VERSION = "0.3.0";
+const VERSION = "0.3.1";
 const REPOSITORY = "https://github.com/PeckBoard/diff-viewer";
 
 /// Build the manifest JSON string. `index.ts`'s `manifest()` export wraps this.
