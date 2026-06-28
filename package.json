@@ -1,6 +1,6 @@
 {
   "name": "peckboard-diff-viewer-plugin",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Peckboard diff-viewer WASM plugin (Extism js-pdk / TypeScript) — side-by-side viewer/editor for changes vs origin/main",
   "scripts": {

@@ -37,6 +37,19 @@ export function gitExec(args: string[], timeoutSecs?: number): ExecResult {
   return hostCall("peckboard_exec", input) as ExecResult;
 }
 
+/// One file in the project-folder listing (path relative to the folder root).
+export interface ProjectFile {
+  path: string;
+  size: number;
+}
+
+/// List the files under the caller's folder (relative paths + sizes). Hidden
+/// and common build/vendor dirs are skipped by core; used here to seed repo
+/// discovery (each file's ancestor dirs are the candidate repo roots).
+export function listProjectFiles(): { files: ProjectFile[]; truncated: boolean } {
+  return hostCall("peckboard_list_project_files", {});
+}
+
 /// Read a UTF-8 text file (lossy) from the project folder.
 export function readFile(path: string): { content: string; truncated: boolean; size: number } {
   return hostCall("peckboard_read_file", { path });

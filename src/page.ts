@@ -48,6 +48,43 @@ export const PAGE = `<!doctype html>
   header h1 { font-size: 1.05rem; margin: 0; }
   header .base { font-size: .8rem; color: var(--muted); }
   header .spacer { flex: 1; }
+  .repo-label {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .78rem;
+    color: var(--muted);
+  }
+  .repo-select {
+    font: inherit;
+    font-size: .82rem;
+    padding: .2rem .4rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    max-width: 22rem;
+  }
+  .picker { padding: 2rem 1rem; }
+  .picker h2 { font-size: 1rem; margin: 0 0 .25rem; }
+  .picker p.sub { color: var(--muted); margin: 0 0 1rem; font-size: .85rem; }
+  .repo-card {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    width: 100%;
+    text-align: left;
+    padding: .6rem .75rem;
+    margin: 0 0 .5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-subtle);
+    cursor: pointer;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .9rem;
+  }
+  .repo-card:hover { background: #ddf4ff; border-color: #b6e3ff; }
+  .repo-card .repo-ico { flex: 0 0 auto; }
   .layout { flex: 1 1 auto; display: flex; min-height: 0; }
   .sidebar {
     width: 320px;
@@ -216,6 +253,9 @@ export const PAGE = `<!doctype html>
 <body>
 <header>
   <h1>Diff Viewer</h1>
+  <label class="repo-label" id="repoLabel" hidden>Repo
+    <select class="repo-select" id="repoSelect"></select>
+  </label>
   <span class="base" id="base"></span>
   <span class="spacer"></span>
   <button id="reload">Reload</button>
@@ -262,8 +302,16 @@ export const PAGE = `<!doctype html>
   var sidebar = document.getElementById("sidebar");
   var main = document.getElementById("main");
   var baseEl = document.getElementById("base");
+  var repoSelect = document.getElementById("repoSelect");
+  var repoLabel = document.getElementById("repoLabel");
 
-  var state = { files: [], base: "origin/main", active: null, mode: "diff" };
+  var state = { repos: [], repo: null, files: [], base: "origin/main", active: null, mode: "diff" };
+
+  // Append the active repo to a query string (so every data call is scoped).
+  function withRepo(q) {
+    if (state.repo == null) return q;
+    return q + (q.indexOf("?") >= 0 ? "&" : "?") + "repo=" + encodeURIComponent(state.repo);
+  }
 
   function statusChar(s) {
     if (s === "added") return "A";
@@ -314,7 +362,7 @@ export const PAGE = `<!doctype html>
     main.appendChild(el("p", "empty", "Loading " + f.path + "…"));
     var q = "/api/plugin-ui/diff/file?path=" + encodeURIComponent(f.path);
     if (f.oldPath) q += "&old_path=" + encodeURIComponent(f.oldPath);
-    apiFetch(q).then(function (res) {
+    apiFetch(withRepo(q)).then(function (res) {
       if (res.status < 200 || res.status >= 300) {
         showMainError(res.body || ("HTTP " + res.status));
         return;
@@ -422,7 +470,7 @@ export const PAGE = `<!doctype html>
     btn.textContent = "Saving…";
     apiFetch("/api/plugin-ui/diff/save", {
       method: "POST",
-      body: JSON.stringify({ path: v.path, content: ta.value }),
+      body: JSON.stringify({ repo: state.repo == null ? "" : state.repo, path: v.path, content: ta.value }),
     }).then(function (res) {
       btn.disabled = false;
       btn.textContent = "Save";
@@ -547,11 +595,83 @@ export const PAGE = `<!doctype html>
     return ops;
   }
 
-  // ── top-level load ──
-  function load() {
+  // ── repo discovery + selection ──
+  function loadRepos() {
     clear(sidebar);
     sidebar.appendChild(el("p", "empty", "Loading…"));
-    apiFetch("/api/plugin-ui/diff/files").then(function (res) {
+    clear(main);
+    main.appendChild(el("p", "empty", "Discovering git repositories…"));
+    apiFetch("/api/plugin-ui/diff/repos").then(function (res) {
+      if (res.status < 200 || res.status >= 300) {
+        clear(sidebar);
+        showMainError(res.body || ("HTTP " + res.status));
+        return;
+      }
+      var data;
+      try { data = JSON.parse(res.body); }
+      catch (e) { showMainError("Parse error: " + e); return; }
+      state.repos = Array.isArray(data.repos) ? data.repos : [];
+      renderRepoSelect();
+      if (state.repos.length === 0) {
+        clear(sidebar);
+        clear(main);
+        main.appendChild(el("div", "banner",
+          "No git repositories found in this folder. The Diff Viewer works on a " +
+          "folder that is a git repo, or that contains repos as subfolders."));
+      } else if (state.repos.length === 1) {
+        selectRepo(state.repos[0].prefix);
+      } else {
+        renderRepoPicker();
+      }
+    });
+  }
+
+  // Populate the header repo dropdown (shown only when ≥1 repo is found).
+  function renderRepoSelect() {
+    clear(repoSelect);
+    if (state.repos.length === 0) { repoLabel.hidden = true; return; }
+    repoLabel.hidden = false;
+    state.repos.forEach(function (r) {
+      var opt = el("option", null, r.label || r.prefix || "(project root)");
+      opt.value = r.prefix;
+      repoSelect.appendChild(opt);
+    });
+    if (state.repo != null) repoSelect.value = state.repo;
+  }
+
+  // A landing picker when several repos are in scope and none is chosen yet.
+  function renderRepoPicker() {
+    clear(sidebar);
+    sidebar.appendChild(el("p", "empty", "Pick a repository to begin."));
+    clear(main);
+    var box = el("div", "picker");
+    box.appendChild(el("h2", null, "Select a repository"));
+    box.appendChild(el("p", "sub", state.repos.length + " git repositories found in this folder."));
+    state.repos.forEach(function (r) {
+      var card = el("button", "repo-card");
+      card.appendChild(el("span", "repo-ico", "\\uD83D\\uDCC1"));
+      card.appendChild(el("span", null, r.label || r.prefix || "(project root)"));
+      card.addEventListener("click", function () { selectRepo(r.prefix); });
+      box.appendChild(card);
+    });
+    main.appendChild(box);
+  }
+
+  function selectRepo(prefix) {
+    state.repo = prefix;
+    state.active = null;
+    state.view = null;
+    if (repoSelect) repoSelect.value = prefix;
+    loadFiles();
+  }
+
+  // ── load the changed-file list for the active repo ──
+  function loadFiles() {
+    clear(sidebar);
+    sidebar.appendChild(el("p", "empty", "Loading…"));
+    clear(main);
+    main.appendChild(el("p", "empty", "Select a file to view its changes."));
+    apiFetch(withRepo("/api/plugin-ui/diff/files")).then(function (res) {
       if (res.status < 200 || res.status >= 300) {
         clear(sidebar);
         sidebar.appendChild(el("div", "error", res.body || ("HTTP " + res.status)));
@@ -567,14 +687,28 @@ export const PAGE = `<!doctype html>
       if (data.base_available === false && data.message) {
         clear(main);
         main.appendChild(el("div", "banner", data.message));
-      } else if (state.files.length > 0 && !state.active) {
-        // leave the prompt; user picks a file
       }
     });
   }
 
-  document.getElementById("reload").addEventListener("click", load);
-  load();
+  // Reload: re-discover repos but keep the current selection if it still exists.
+  function reload() {
+    var keep = state.repo;
+    apiFetch("/api/plugin-ui/diff/repos").then(function (res) {
+      if (res.status < 200 || res.status >= 300) { loadRepos(); return; }
+      var data;
+      try { data = JSON.parse(res.body); } catch (e) { loadRepos(); return; }
+      state.repos = Array.isArray(data.repos) ? data.repos : [];
+      renderRepoSelect();
+      var stillThere = keep != null && state.repos.some(function (r) { return r.prefix === keep; });
+      if (stillThere) { selectRepo(keep); }
+      else { state.repo = null; loadRepos(); }
+    });
+  }
+
+  repoSelect.addEventListener("change", function () { selectRepo(repoSelect.value); });
+  document.getElementById("reload").addEventListener("click", reload);
+  loadRepos();
 })();
 </script>
 </body>
